@@ -255,3 +255,4 @@ secrets/
 
 # Explicitly include Claude settings
 !.claude/settings.local.json
+.certs/

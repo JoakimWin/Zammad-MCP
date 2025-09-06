@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zammad MCP HTTP Client</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        h1 {
+            color: #333;
+        }
+        .container {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .output {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 15px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            max-height: 400px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+        }
+        .status {
+            display: inline-block;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+            margin-left: 10px;
+        }
+        .status.connected {
+            background: #28a745;
+            color: white;
+        }
+        .status.disconnected {
+            background: #dc3545;
+            color: white;
+        }
+        .status.connecting {
+            background: #ffc107;
+            color: black;
+        }
+        input[type="text"] {
+            padding: 8px;
+            border: 1px solid #ced4da;
+            border-radius: 4px;
+            width: 300px;
+            margin-right: 10px;
+        }
+        select {
+            padding: 8px;
+            border: 1px solid #ced4da;
+            border-radius: 4px;
+            margin-right: 10px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        .form-group label {
+            display: inline-block;
+            width: 120px;
+            font-weight: bold;
+        }
+        .tab-container {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #dee2e6;
+        }
+        .tab {
+            padding: 10px 20px;
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+            border-bottom: 3px solid transparent;
+            margin-bottom: -2px;
+        }
+        .tab:hover {
+            background: #f8f9fa;
+        }
+        .tab.active {
+            border-bottom-color: #007bff;
+            color: #007bff;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <h1>Zammad MCP HTTP Client
+        <span id="connectionStatus" class="status disconnected">Disconnected</span>
+    </h1>
+
+    <div class="container">
+        <h2>Server Configuration</h2>
+        <div class="form-group">
+            <label>Server URL:</label>
+            <input type="text" id="serverUrl" value="http://localhost:8080" />
+            <button onclick="testConnection()">Test Connection</button>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="tab-container">
+            <button class="tab active" onclick="switchTab('tools')">Tools</button>
+            <button class="tab" onclick="switchTab('resources')">Resources</button>
+            <button class="tab" onclick="switchTab('prompts')">Prompts</button>
+            <button class="tab" onclick="switchTab('sse')">SSE Stream</button>
+        </div>
+
+        <div id="tools" class="tab-content active">
+            <h3>Tools</h3>
+            <div class="button-group">
+                <button onclick="listTools()">List Tools</button>
+                <button onclick="callTool()">Call Tool</button>
+            </div>
+            <div class="form-group">
+                <label>Tool Name:</label>
+                <select id="toolName">
+                    <option value="get_current_user">get_current_user</option>
+                    <option value="list_groups">list_groups</option>
+                    <option value="list_ticket_states">list_ticket_states</option>
+                    <option value="list_ticket_priorities">list_ticket_priorities</option>
+                    <option value="search_tickets">search_tickets</option>
+                </select>
+            </div>
+            <div class="output" id="toolsOutput">Click "List Tools" to see available tools...</div>
+        </div>
+
+        <div id="resources" class="tab-content">
+            <h3>Resources</h3>
+            <div class="button-group">
+                <button onclick="listResources()">List Resources</button>
+                <button onclick="readResource()">Read Resource</button>
+            </div>
+            <div class="form-group">
+                <label>Resource URI:</label>
+                <input type="text" id="resourceUri" placeholder="zammad://ticket/123" />
+            </div>
+            <div class="output" id="resourcesOutput">Click "List Resources" to see available resources...</div>
+        </div>
+
+        <div id="prompts" class="tab-content">
+            <h3>Prompts</h3>
+            <div class="button-group">
+                <button onclick="listPrompts()">List Prompts</button>
+            </div>
+            <div class="output" id="promptsOutput">Click "List Prompts" to see available prompts...</div>
+        </div>
+
+        <div id="sse" class="tab-content">
+            <h3>SSE Stream Test</h3>
+            <div class="button-group">
+                <button onclick="startSSE()">Start SSE Stream</button>
+                <button onclick="stopSSE()">Stop SSE Stream</button>
+            </div>
+            <div class="output" id="sseOutput">Click "Start SSE Stream" to begin...</div>
+        </div>
+    </div>
+
+    <script>
+        let eventSource = null;
+
+        function getServerUrl() {
+            return document.getElementById('serverUrl').value;
+        }
+
+        function setStatus(status) {
+            const statusEl = document.getElementById('connectionStatus');
+            statusEl.className = `status ${status}`;
+            statusEl.textContent = status.charAt(0).toUpperCase() + status.slice(1);
+        }
+
+        async function testConnection() {
+            setStatus('connecting');
+            try {
+                const response = await fetch(`${getServerUrl()}/health`);
+                if (response.ok) {
+                    const data = await response.json();
+                    setStatus('connected');
+                    alert('Connection successful! Server is healthy.');
+                } else {
+                    setStatus('disconnected');
+                    alert('Connection failed! Server returned an error.');
+                }
+            } catch (error) {
+                setStatus('disconnected');
+                alert(`Connection failed: ${error.message}`);
+            }
+        }
+
+        function switchTab(tabName) {
+            // Update tab buttons
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            event.target.classList.add('active');
+
+            // Update tab content
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            document.getElementById(tabName).classList.add('active');
+        }
+
+        async function makeRequest(method, params = null) {
+            try {
+                const response = await fetch(`${getServerUrl()}/mcp/call`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ method, params })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                return data;
+            } catch (error) {
+                return { error: { message: error.message } };
+            }
+        }
+
+        async function listTools() {
+            const output = document.getElementById('toolsOutput');
+            output.textContent = 'Loading tools...';
+            
+            const result = await makeRequest('tools/list');
+            
+            if (result.error) {
+                output.textContent = `Error: ${result.error.message}`;
+            } else if (result.result && result.result.tools) {
+                output.textContent = JSON.stringify(result.result.tools, null, 2);
+            } else {
+                output.textContent = 'No tools found or unexpected response format';
+            }
+        }
+
+        async function callTool() {
+            const output = document.getElementById('toolsOutput');
+            const toolName = document.getElementById('toolName').value;
+            output.textContent = `Calling tool: ${toolName}...`;
+            
+            const result = await makeRequest(`tools/call/${toolName}`, {});
+            
+            if (result.error) {
+                output.textContent = `Error: ${result.error.message}`;
+            } else if (result.result) {
+                output.textContent = JSON.stringify(result.result, null, 2);
+            } else {
+                output.textContent = 'No result or unexpected response format';
+            }
+        }
+
+        async function listResources() {
+            const output = document.getElementById('resourcesOutput');
+            output.textContent = 'Loading resources...';
+            
+            const result = await makeRequest('resources/list');
+            
+            if (result.error) {
+                output.textContent = `Error: ${result.error.message}`;
+            } else if (result.result && result.result.resources) {
+                output.textContent = JSON.stringify(result.result.resources, null, 2);
+            } else {
+                output.textContent = 'No resources found or unexpected response format';
+            }
+        }
+
+        async function readResource() {
+            const output = document.getElementById('resourcesOutput');
+            const resourceUri = document.getElementById('resourceUri').value;
+            
+            if (!resourceUri) {
+                alert('Please enter a resource URI');
+                return;
+            }
+            
+            output.textContent = `Reading resource: ${resourceUri}...`;
+            
+            const result = await makeRequest(`resources/read/${resourceUri}`);
+            
+            if (result.error) {
+                output.textContent = `Error: ${result.error.message}`;
+            } else if (result.result) {
+                output.textContent = JSON.stringify(result.result, null, 2);
+            } else {
+                output.textContent = 'No result or unexpected response format';
+            }
+        }
+
+        async function listPrompts() {
+            const output = document.getElementById('promptsOutput');
+            output.textContent = 'Loading prompts...';
+            
+            const result = await makeRequest('prompts/list');
+            
+            if (result.error) {
+                output.textContent = `Error: ${result.error.message}`;
+            } else if (result.result && result.result.prompts) {
+                output.textContent = JSON.stringify(result.result.prompts, null, 2);
+            } else {
+                output.textContent = 'No prompts found or unexpected response format';
+            }
+        }
+
+        function startSSE() {
+            const output = document.getElementById('sseOutput');
+            output.textContent = 'Connecting to SSE stream...\n';
+            
+            if (eventSource) {
+                eventSource.close();
+            }
+            
+            // Create SSE connection
+            fetch(`${getServerUrl()}/mcp/stream`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ method: 'tools/list' })
+            }).then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = '';
+                
+                function processStream() {
+                    reader.read().then(({ done, value }) => {
+                        if (done) {
+                            output.textContent += '\nStream ended.\n';
+                            return;
+                        }
+                        
+                        buffer += decoder.decode(value, { stream: true });
+                        
+                        // Parse SSE events
+                        const lines = buffer.split('\n');
+                        buffer = lines.pop() || ''; // Keep incomplete line in buffer
+                        
+                        for (const line of lines) {
+                            if (line.startsWith('event:')) {
+                                const event = line.slice(6).trim();
+                                output.textContent += `\nEvent: ${event}\n`;
+                            } else if (line.startsWith('data:')) {
+                                const data = line.slice(5).trim();
+                                try {
+                                    const json = JSON.parse(data);
+                                    output.textContent += `Data: ${JSON.stringify(json, null, 2)}\n`;
+                                } catch (e) {
+                                    output.textContent += `Data: ${data}\n`;
+                                }
+                            }
+                        }
+                        
+                        // Continue reading
+                        processStream();
+                    }).catch(error => {
+                        output.textContent += `\nError: ${error.message}\n`;
+                    });
+                }
+                
+                processStream();
+            }).catch(error => {
+                output.textContent = `Error connecting to SSE: ${error.message}`;
+            });
+        }
+
+        function stopSSE() {
+            if (eventSource) {
+                eventSource.close();
+                eventSource = null;
+                document.getElementById('sseOutput').textContent += '\nSSE stream stopped.\n';
+            }
+        }
+
+        // Test connection on load
+        window.addEventListener('load', () => {
+            testConnection();
+        });
+    </script>
+</body>
+</html>

@@ -168,9 +168,97 @@ The server requires Zammad API credentials. The recommended approach is to use a
 
 ## Usage
 
+### HTTP/HTTPS/SSE Mode (NEW!)
+
+Run the server with HTTP/HTTPS/SSE support for web-based access and Claude Desktop HTTP connector:
+
+#### HTTP Mode
+```bash
+# Start server in HTTP mode
+python -m mcp_zammad --mode http --host 0.0.0.0 --port 8080
+
+# With custom settings
+python -m mcp_zammad --mode http --host 127.0.0.1 --port 3000 --log-level DEBUG
+```
+
+#### HTTPS Mode (Required for Claude Desktop HTTP Connector)
+```bash
+# Generate self-signed certificate and run HTTPS server
+python -m mcp_zammad --mode http --port 8443 --ssl --ssl-generate
+
+# Use existing certificate files
+python -m mcp_zammad --mode http --port 8443 --ssl \
+  --ssl-cert /path/to/cert.pem \
+  --ssl-key /path/to/key.pem
+
+# For Claude Desktop connector (HTTPS required)
+python -m mcp_zammad --mode http --host localhost --port 8088 --ssl --ssl-generate
+```
+
+**Note**: Self-signed certificates will show security warnings in browsers. For production, use proper certificates from a Certificate Authority.
+
+#### HTTP API Endpoints
+
+- `GET /health` - Health check endpoint
+- `POST /mcp/call` - Execute MCP methods (tools, resources, prompts)
+- `POST /mcp/stream` - Server-Sent Events streaming endpoint
+
+#### Example HTTP Usage
+
+```javascript
+// List available tools
+const response = await fetch('http://localhost:8080/mcp/call', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ method: 'tools/list' })
+});
+
+// Call a tool
+const result = await fetch('http://localhost:8080/mcp/call', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    method: 'tools/call/search_tickets',
+    params: { state: 'open' }
+  })
+});
+```
+
+See `examples/http_client.html` for a complete web-based client example.
+
 ### With Claude Desktop
 
-Add to your Claude Desktop configuration:
+Claude Desktop supports both stdio and HTTPS connector modes:
+
+#### Option 1: HTTPS Connector Mode (NEW!)
+
+First, start the HTTPS server:
+```bash
+# Start HTTPS server for Claude Desktop connector
+python -m mcp_zammad --mode http --host localhost --port 8088 --ssl --ssl-generate
+```
+
+Then add to your Claude Desktop configuration:
+```json
+{
+  "mcpServers": {
+    "zammad": {
+      "type": "http",
+      "url": "https://localhost:8088",
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "tls": {
+        "rejectUnauthorized": false
+      }
+    }
+  }
+}
+```
+
+**Note**: The `rejectUnauthorized: false` is required for self-signed certificates in development.
+
+#### Option 2: Traditional stdio Mode
 
 ```json
 {

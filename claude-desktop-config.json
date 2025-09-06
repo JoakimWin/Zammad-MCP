@@ -1,0 +1,26 @@
+{
+  "mcpServers": {
+    "zammad-https": {
+      "type": "http",
+      "url": "https://localhost:8088",
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "env": {
+        "ZAMMAD_URL": "https://your-instance.zammad.com/api/v1",
+        "ZAMMAD_HTTP_TOKEN": "your-api-token"
+      },
+      "tls": {
+        "rejectUnauthorized": false
+      }
+    },
+    "zammad-stdio": {
+      "command": "uvx",
+      "args": ["--from", "git+https://github.com/basher83/zammad-mcp.git", "mcp-zammad"],
+      "env": {
+        "ZAMMAD_URL": "https://your-instance.zammad.com/api/v1",
+        "ZAMMAD_HTTP_TOKEN": "your-api-token"
+      }
+    }
+  }
+}
