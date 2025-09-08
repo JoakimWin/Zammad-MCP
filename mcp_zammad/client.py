@@ -158,12 +158,73 @@ class ZammadClient:
             result = self.api.ticket.all(filters=filters)
 
         return list(result)
+    
+    def get_ticket_by_number(
+        self, ticket_number: str, include_articles: bool = True, article_limit: int = 10, article_offset: int = 0
+    ) -> dict[str, Any]:
+        """Get a single ticket by ticket number with optional article pagination."""
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"ZammadClient.get_ticket_by_number called with ticket_number={ticket_number}")
+        
+        # Search for the ticket by number
+        search_results = self.api.ticket.search(f"number:{ticket_number}")
+        
+        if not search_results:
+            raise ValueError(f"Ticket with number {ticket_number} does not exist")
+        
+        # Get the first result (should be the only one with exact number match)
+        ticket_data = None
+        for result in search_results:
+            if isinstance(result, dict) and result.get('number') == ticket_number:
+                ticket_data = result
+                break
+            elif hasattr(result, 'number') and result.number == ticket_number:
+                ticket_data = dict(result)
+                break
+        
+        if not ticket_data:
+            # If no exact match, try to use the first result
+            ticket_data = dict(search_results[0]) if search_results else None
+            
+        if not ticket_data:
+            raise ValueError(f"Ticket with number {ticket_number} does not exist")
+        
+        # Now get the full ticket details using the ID
+        ticket_id = ticket_data.get('id')
+        if not ticket_id:
+            raise ValueError(f"Could not get ID for ticket number {ticket_number}")
+        
+        logger.info(f"Found ticket ID {ticket_id} for ticket number {ticket_number}")
+        return self.get_ticket(ticket_id, include_articles, article_limit, article_offset)
 
     def get_ticket(
         self, ticket_id: int, include_articles: bool = True, article_limit: int = 10, article_offset: int = 0
     ) -> dict[str, Any]:
         """Get a single ticket by ID with optional article pagination."""
-        ticket = self.api.ticket.find(ticket_id)
+        # Debug logging
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"ZammadClient.get_ticket called with ticket_id={ticket_id}, type={type(ticket_id).__name__}")
+        logger.info(f"ticket_id value: {repr(ticket_id)}")
+        
+        # Ensure ticket_id is truly an integer before calling the API
+        if not isinstance(ticket_id, int):
+            logger.warning(f"ticket_id is not an int, it's {type(ticket_id).__name__}: {repr(ticket_id)}")
+            if hasattr(ticket_id, '__int__'):
+                ticket_id = int(ticket_id)
+                logger.info(f"Converted ticket_id to int: {ticket_id}")
+        
+        try:
+            ticket = self.api.ticket.find(ticket_id)
+        except Exception as e:
+            logger.error(f"Failed to find ticket {ticket_id}: {e}")
+            # Check if it's a 404 not found error
+            error_str = str(e)
+            if "404" in error_str or "not found" in error_str.lower() or "couldn't find" in error_str.lower():
+                raise ValueError(f"Ticket with ID {ticket_id} does not exist")
+            else:
+                raise
 
         if include_articles:
             articles = self.api.ticket.articles(ticket_id)

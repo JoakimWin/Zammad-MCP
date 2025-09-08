@@ -154,7 +154,7 @@ class ZammadMCPServer:
             """Get detailed information about a specific ticket.
 
             Args:
-                ticket_id: The ticket ID
+                ticket_id: The ticket ID or ticket number (e.g., 79004)
                 include_articles: Whether to include ticket articles/comments
                 article_limit: Maximum number of articles to return (default: 10, use -1 for all)
                 article_offset: Number of articles to skip (for pagination, default: 0)
@@ -164,9 +164,34 @@ class ZammadMCPServer:
 
             Note: Large tickets with many articles may exceed token limits. Use article_limit
             to control the response size. Articles are returned in chronological order.
+            
+            Note: This function accepts either the internal ticket ID (small integers like 1, 2, 3) 
+            or the ticket number (large numbers like 79004). If a large number is provided,
+            it will search for the ticket by number instead of ID.
             """
+            # Debug logging to check parameter types
+            logger.info(f"get_ticket called with ticket_id={ticket_id}, type={type(ticket_id).__name__}")
+            logger.info(f"ticket_id value: {repr(ticket_id)}")
+            
+            # Ensure ticket_id is an integer
+            if isinstance(ticket_id, str):
+                logger.warning(f"ticket_id received as string, converting to int: '{ticket_id}'")
+                try:
+                    ticket_id = int(ticket_id)
+                except ValueError as e:
+                    logger.error(f"Failed to convert ticket_id to int: {e}")
+                    raise ValueError(f"Invalid ticket_id: must be an integer, got '{ticket_id}'")
+            
             client = self.get_client()
-            ticket_data = client.get_ticket(ticket_id, include_articles, article_limit, article_offset)
+            
+            # If ticket_id is large (> 1000), it's likely a ticket number, not an ID
+            # Zammad ticket IDs are typically small integers, while ticket numbers are large
+            if ticket_id > 1000:
+                logger.info(f"Large ticket_id {ticket_id} detected, treating as ticket number")
+                ticket_data = client.get_ticket_by_number(str(ticket_id), include_articles, article_limit, article_offset)
+            else:
+                ticket_data = client.get_ticket(ticket_id, include_articles, article_limit, article_offset)
+            
             return Ticket(**ticket_data)
 
         @self.mcp.tool()
