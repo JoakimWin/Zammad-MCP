@@ -123,7 +123,7 @@ class ZammadMCPServer:
             """Search for tickets with various filters.
 
             Args:
-                query: Free text search query
+                query: Free text search query (e.g. for searching for all tickets for september 2025, use 2025-09)
                 state: Filter by state (new, open, closed, etc.)
                 priority: Filter by priority (1 low, 2 normal, 3 high)
                 group: Filter by group name
