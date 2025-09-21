@@ -119,7 +119,7 @@ class ZammadMCPServer:
             per_page: int = 25,
             max_pages: int = 4,
             max_results: int = 50,
-        ) -> list[Ticket]:
+        ) -> list[str]:
             """Search for tickets with various filters.
 
             Args:
@@ -137,6 +137,22 @@ class ZammadMCPServer:
                 List of tickets matching the search criteria
             """
             client = self.get_client()
+
+            logger.info(
+                "search_tickets called",
+                extra={
+                    "query": query,
+                    "state": state,
+                    "priority": priority,
+                    "group": group,
+                    "owner": owner,
+                    "customer": customer,
+                    "page": page,
+                    "per_page": per_page,
+                    "max_pages": max_pages,
+                    "max_results": max_results,
+                },
+            )
 
             params: dict[str, Any] = {
                 "query": query,
@@ -199,6 +215,7 @@ class ZammadMCPServer:
                 )
 
                 if not tickets_data:
+                    logger.info("search_tickets page returned no results", extra={"page": current_page})
                     break
 
                 tickets.extend(Ticket(**ticket) for ticket in tickets_data)
@@ -217,24 +234,32 @@ class ZammadMCPServer:
             for idx, ticket in enumerate(tickets, start=1):
                 if max_results and len(summaries) >= max_results:
                     break
-                summary = [
-                    f"{idx}. Ticket #{ticket.number or ticket.id}",
-                    f"Title: {ticket.title}",
-                    f"State: {ticket.state}",
-                    f"Priority: {ticket.priority}",
-                    f"Customer: {ticket.customer}",
-                    f"Group: {ticket.group}",
-                    f"Owner: {ticket.owner or '-'}",
-                    f"Created: {ticket.created_at}",
-                    f"Updated: {ticket.updated_at}",
-                    f"Articles: {ticket.article_count}",
-                ]
-                summaries.append("\n".join(summary))
+                summaries.append(
+                    "\n".join(
+                        [
+                            f"{idx}. Ticket #{ticket.number or ticket.id}",
+                            f"Title: {ticket.title}",
+                            f"State: {ticket.state}",
+                            f"Priority: {ticket.priority}",
+                            f"Customer: {ticket.customer}",
+                            f"Owner: {ticket.owner or '-'}",
+                            f"Group: {ticket.group}",
+                            f"Created: {ticket.created_at}",
+                            f"Updated: {ticket.updated_at}",
+                            f"Articles: {ticket.article_count}",
+                        ]
+                    )
+                )
 
             if len(tickets) > len(summaries):
                 summaries.append(
                     f"... {len(tickets) - len(summaries)} additional tickets truncated"
                 )
+
+            logger.info(
+                "search_tickets returning summaries",
+                extra={"tickets_returned": len(summaries)}
+            )
 
             return summaries
 
