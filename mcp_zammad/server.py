@@ -117,6 +117,8 @@ class ZammadMCPServer:
             customer: str | None = None,
             page: int = 1,
             per_page: int = 25,
+            max_pages: int = 4,
+            max_results: int = 50,
         ) -> list[Ticket]:
             """Search for tickets with various filters.
 
@@ -129,23 +131,67 @@ class ZammadMCPServer:
                 customer: Filter by customer email
                 page: Page number (default: 1)
                 per_page: Results per page (default: 25)
+                max_pages: Number of pages to retrieve (default: 4, set to 1 to disable pagination)
 
             Returns:
                 List of tickets matching the search criteria
             """
             client = self.get_client()
-            tickets_data = client.search_tickets(
-                query=query,
-                state=state,
-                priority=priority,
-                group=group,
-                owner=owner,
-                customer=customer,
-                page=page,
-                per_page=per_page,
-            )
+            tickets: list[Ticket] = []
+            current_page = max(page, 1)
+            pages_remaining = max(max_pages, 1)
 
-            return [Ticket(**ticket) for ticket in tickets_data]
+            while pages_remaining > 0:
+                tickets_data = client.search_tickets(
+                    query=query,
+                    state=state,
+                    priority=priority,
+                    group=group,
+                    owner=owner,
+                    customer=customer,
+                    page=current_page,
+                    per_page=per_page,
+                )
+
+                if not tickets_data:
+                    break
+
+                tickets.extend(Ticket(**ticket) for ticket in tickets_data)
+
+                if len(tickets_data) < per_page:
+                    # No more pages available
+                    break
+
+                if max_results and len(tickets) >= max_results:
+                    break
+
+                current_page += 1
+                pages_remaining -= 1
+
+            summaries: list[str] = []
+            for idx, ticket in enumerate(tickets, start=1):
+                if max_results and len(summaries) >= max_results:
+                    break
+                summary = [
+                    f"{idx}. Ticket #{ticket.number or ticket.id}",
+                    f"Title: {ticket.title}",
+                    f"State: {ticket.state}",
+                    f"Priority: {ticket.priority}",
+                    f"Customer: {ticket.customer}",
+                    f"Group: {ticket.group}",
+                    f"Owner: {ticket.owner or '-'}",
+                    f"Created: {ticket.created_at}",
+                    f"Updated: {ticket.updated_at}",
+                    f"Articles: {ticket.article_count}",
+                ]
+                summaries.append("\n".join(summary))
+
+            if len(tickets) > len(summaries):
+                summaries.append(
+                    f"... {len(tickets) - len(summaries)} additional tickets truncated"
+                )
+
+            return summaries
 
         @self.mcp.tool()
         def get_ticket(
