@@ -137,6 +137,51 @@ class ZammadMCPServer:
                 List of tickets matching the search criteria
             """
             client = self.get_client()
+
+            params: dict[str, Any] = {
+                "query": query,
+                "state": state,
+                "priority": priority,
+                "group": group,
+                "owner": owner,
+                "customer": customer,
+                "page": page,
+                "per_page": per_page,
+            }
+
+            for key in list(params.keys()):
+                value = params[key]
+                if isinstance(value, str) and "=" in value and " " in value:
+                    tokens = shlex.split(value)
+                    explicit_value = None
+                    for token in tokens:
+                        if "=" in token:
+                            assign_key, assign_value = token.split("=", 1)
+                            assign_key = assign_key.strip()
+                            assign_value = assign_value.strip()
+                            if assign_key in params:
+                                params[assign_key] = assign_value
+                        else:
+                            if explicit_value is None:
+                                explicit_value = token.strip()
+                    if explicit_value is not None:
+                        params[key] = explicit_value
+
+            query = params["query"]
+            state = params["state"]
+            priority = params["priority"]
+            group = params["group"]
+            owner = params["owner"]
+            customer = params["customer"]
+            try:
+                page = int(params["page"])
+            except (TypeError, ValueError):
+                page = 1
+            try:
+                per_page = int(params["per_page"])
+            except (TypeError, ValueError):
+                per_page = 25
+
             tickets: list[Ticket] = []
             current_page = max(page, 1)
             pages_remaining = max(max_pages, 1)
