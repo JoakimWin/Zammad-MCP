@@ -151,8 +151,17 @@ class ZammadClient:
         if customer:
             search_parts.append(f"customer.email:{customer}")
 
-        if search_parts:
-            search_query = " AND ".join(search_parts)
+        search_query = " AND ".join(search_parts) if search_parts else None
+
+        logger.info(
+            "search_tickets executing",
+            extra={
+                "search_query": search_query,
+                "filters": filters,
+            },
+        )
+
+        if search_query:
             result = self.api.ticket.search(search_query, filters=filters)
         else:
             result = self.api.ticket.all(filters=filters)
